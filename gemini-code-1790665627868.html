@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Bug Hunter - สื่อการเรียนรู้วิทยาการคำนวณ ป.5</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .canvas-container { position: relative; display: inline-block; }
+        canvas { 
+            background: #1e293b; border: 4px solid #334155; border-radius: 0.5rem; 
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2); cursor: crosshair; transition: all 0.3s;
+        }
+        canvas:hover { border-color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); }
+        .floating-text {
+            position: absolute; color: #ef4444; font-weight: bold; font-size: 1.5rem;
+            pointer-events: none; animation: floatUp 1s ease-out forwards; z-index: 50; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.5); opacity: 0; }
+        }
+        .btn-cyber {
+            background: linear-gradient(45deg, #059669, #10b981); transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3), 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+        .btn-cyber:hover { transform: translateY(-2px); box-shadow: 0 6px 8px rgba(0,0,0,0.4), 0 0 15px rgba(16, 185, 129, 0.7); }
+        .btn-cyber:active { transform: translateY(1px); }
+        
+        .pulse-anim { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-6 px-4">
+
+    <header class="text-center mb-6 w-full max-w-5xl">
+        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-2">
+            👾 Cyber Bug Hunter : ภารกิจจับบั๊ก
+        </h1>
+        <p class="text-slate-400 text-sm md:text-base">
+            ว 4.2 ป.5/2 "ออกแบบ และเขียนโปรแกรมอย่างง่าย โดยใช้ซอฟต์แวร์หรือสื่อ และตรวจหาข้อผิดพลาดและแก้ไข" <br>
+            <span class="text-emerald-400 font-semibold">วิธีเล่น:</span> ค้นหาจุดบกพร่อง (Bugs) โดยเปรียบเทียบภาพต้นฉบับ (ซ้าย) และภาพที่มีข้อผิดพลาด (ขวา)
+        </p>
+    </header>
+
+    <div class="glass-panel w-full max-w-5xl rounded-xl p-4 mb-6 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center gap-4">
+            <div class="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
+                <span class="text-slate-400 text-sm block">ด่านปัจจุบัน</span>
+                <span id="stage-display" class="text-xl font-bold text-white">1 : Robot Lab</span>
+            </div>
+            <div class="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700">
+                <span class="text-slate-400 text-sm block">จุดบกพร่องที่พบ</span>
+                <span id="score-display" class="text-xl font-bold text-cyan-400">0 / 5</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-center min-w-[120px]">
+                <span class="text-slate-400 text-sm block">เวลาคงเหลือ</span>
+                <span id="timer-display" class="text-2xl font-bold text-emerald-400">00:00</span>
+            </div>
+            <button id="hint-btn" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 opacity-50 cursor-not-allowed" disabled>
+                💡 คำใบ้ (-10s)
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-col md:flex-row gap-6 justify-center items-center w-full max-w-6xl relative" id="game-wrapper">
+        <div class="canvas-container">
+            <div class="absolute top-2 left-2 bg-slate-900/80 text-white px-3 py-1 rounded-md text-sm font-bold border border-slate-600 z-10">ภาพต้นฉบับ (Original)</div>
+            <canvas id="canvas-left" width="500" height="400"></canvas>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="absolute top-2 right-2 bg-rose-900/80 text-white px-3 py-1 rounded-md text-sm font-bold border border-rose-600 z-10">ภาพที่มีบั๊ก (Bugged)</div>
+            <canvas id="canvas-right" width="500" height="400"></canvas>
+        </div>
+    </div>
+
+    <div id="start-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
+        <div class="glass-panel p-8 rounded-2xl max-w-md w-full text-center border-t border-white/20 shadow-2xl">
+            <h2 class="text-3xl font-bold text-white mb-2" id="modal-title">ตั้งค่าภารกิจ</h2>
+            <p class="text-slate-300 mb-6" id="modal-desc">เลือกระดับความยากเพื่อเริ่มจับบั๊ก!</p>
+            
+            <div class="flex flex-col gap-3 mb-8" id="difficulty-selector">
+                <button class="diff-btn bg-slate-800 hover:bg-slate-700 border-2 border-emerald-500 text-emerald-400 py-3 rounded-xl font-bold transition-all relative overflow-hidden" data-diff="0">
+                    🟢 Normal (ปกติ)<br><span class="text-xs text-slate-400 font-normal">60 วินาที | 5 จุด | เป้าหมายใหญ่</span>
+                </button>
+                <button class="diff-btn bg-slate-800 hover:bg-slate-700 border-2 border-slate-600 text-orange-400 py-3 rounded-xl font-bold transition-all relative overflow-hidden" data-diff="1">
+                    🟧 Hard (ยาก)<br><span class="text-xs text-slate-400 font-normal">45 วินาที | 5 จุด | เป้าปานกลาง | พลาดหัก 3 วิ</span>
+                </button>
+                <button class="diff-btn bg-slate-800 hover:bg-slate-700 border-2 border-slate-600 text-rose-500 py-3 rounded-xl font-bold transition-all relative overflow-hidden" data-diff="2">
+                    💀 Nightmare (ฝันร้าย)<br><span class="text-xs text-slate-400 font-normal">30 วินาที | 7 จุด | เป้าเล็กจิ๋ว | พลาดหัก 5 วิ</span>
+                </button>
+            </div>
+            
+            <button id="start-btn" class="btn-cyber text-white font-bold text-xl py-3 px-12 rounded-full w-full pulse-anim">
+                🚀 เริ่มระบบ (Start)
+            </button>
+        </div>
+    </div>
+
+    <div id="result-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-slate-900/90 backdrop-blur-md">
+        <div class="glass-panel p-8 rounded-2xl max-w-lg w-full text-center border-t border-white/20 shadow-2xl">
+            <h2 id="result-title" class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4">ด่านสำเร็จ!</h2>
+            
+            <div id="stars-container" class="flex justify-center gap-2 mb-6 text-5xl grayscale opacity-50 transition-all duration-1000">
+                <span>⭐</span><span>⭐</span><span>⭐</span>
+            </div>
+
+            <p id="result-message" class="text-lg text-slate-300 mb-6">คุณจับบั๊กได้ครบถ้วน!</p>
+            
+            <div id="final-stats" class="bg-slate-800/50 rounded-lg p-4 mb-6 hidden">
+                <h3 class="text-xl font-bold text-white mb-2">สรุปผลงานระดับโปรแกรมเมอร์</h3>
+                <p class="text-emerald-400 text-2xl font-black mb-2" id="rank-text">Senior Bug Hunter</p>
+                <p class="text-slate-400 text-sm" id="score-summary">คะแนนรวม...</p>
+            </div>
+
+            <div class="flex gap-4 justify-center">
+                <button id="replay-btn" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-xl transition-colors w-full hidden">
+                    🔄 เล่นใหม่ (Replay)
+                </button>
+                <button id="next-btn" class="btn-cyber text-white font-bold py-3 px-6 rounded-xl transition-colors w-full">
+                    ⏩ ด่านถัดไป (Next Stage)
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/** * SYSTEM ARCHITECTURE & STATE MANAGEMENT 
+ */
+const GAME_STATE = {
+    stage: 0,
+    difficulty: 0, // 0: Normal, 1: Hard, 2: Nightmare
+    isPlaying: false,
+    timeLeft: 0,
+    timerId: null,
+    foundSpots: [],
+    totalStars: 0,
+};
+
+const DIFFICULTY_SETTINGS = [
+    { time: 60, diffCount: 5, radius: 28, penalty: 0 },
+    { time: 45, diffCount: 5, radius: 22, penalty: 3 },
+    { time: 30, diffCount: 7, radius: 16, penalty: 5 }
+];
+
+// Data for each stage's differences
+const STAGES = [
+    {
+        name: "Robot Lab",
+        diffs: [
+            { id: 0, x: 250, y: 80, desc: "Antenna" },
+            { id: 1, x: 220, y: 150, desc: "Left Eye" },
+            { id: 2, x: 250, y: 240, desc: "Chest Badge" },
+            { id: 3, x: 120, y: 350, desc: "Wrench on table" },
+            { id: 4, x: 420, y: 100, desc: "Wall Gear" },
+            { id: 5, x: 190, y: 310, desc: "Leg Screw (Nightmare)" },
+            { id: 6, x: 400, y: 260, desc: "Blueprint Line (Nightmare)" }
+        ]
+    },
+    {
+        name: "Server Room",
+        diffs: [
+            { id: 0, x: 150, y: 120, desc: "Server Light 1" },
+            { id: 1, x: 300, y: 370, desc: "Floor Cable" },
+            { id: 2, x: 250, y: 200, desc: "Cooling Fan Blade" },
+            { id: 3, x: 420, y: 150, desc: "Monitor Graph" },
+            { id: 4, x: 100, y: 250, desc: "Rack Handle" },
+            { id: 5, x: 250, y: 80, desc: "Warning Label (Nightmare)" },
+            { id: 6, x: 180, y: 330, desc: "Vent Hole (Nightmare)" }
+        ]
+    },
+    {
+        name: "Robot Arena",
+        diffs: [
+            { id: 0, x: 250, y: 60, desc: "Scoreboard Number" },
+            { id: 1, x: 150, y: 250, desc: "Bot 1 Weapon" },
+            { id: 2, x: 350, y: 250, desc: "Bot 2 Wheel" },
+            { id: 3, x: 250, y: 180, desc: "Obstacle Cone" },
+            { id: 4, x: 430, y: 320, desc: "Battery Pack" },
+            { id: 5, x: 250, y: 330, desc: "Floor Logo (Nightmare)" },
+            { id: 6, x: 50, y: 150, desc: "Wall Bolt (Nightmare)" }
+        ]
+    },
+    {
+        name: "Game Dev Studio",
+        diffs: [
+            { id: 0, x: 200, y: 180, desc: "Code syntax" },
+            { id: 1, x: 100, y: 250, desc: "Coffee Mug Logo" },
+            { id: 2, x: 400, y: 130, desc: "Poster Graphic" },
+            { id: 3, x: 250, y: 280, desc: "Keyboard Spacebar" },
+            { id: 4, x: 340, y: 280, desc: "Mouse Wire" },
+            { id: 5, x: 60, y: 150, desc: "Plant Leaf (Nightmare)" },
+            { id: 6, x: 280, y: 130, desc: "Sticky Note Text (Nightmare)" }
+        ]
+    },
+    {
+        name: "Space Shuttle",
+        diffs: [
+            { id: 0, x: 250, y: 120, desc: "Planet Rings" },
+            { id: 1, x: 150, y: 310, desc: "Radar Blip" },
+            { id: 2, x: 350, y: 310, desc: "Main Button" },
+            { id: 3, x: 120, y: 80, desc: "Star Constellation" },
+            { id: 4, x: 430, y: 280, desc: "Control Lever" },
+            { id: 5, x: 250, y: 280, desc: "Fuel Gauge (Nightmare)" },
+            { id: 6, x: 350, y: 260, desc: "Panel Text (Nightmare)" }
+        ]
+    }
+];
+
+// Elements
+const canvasL = document.getElementById('canvas-left');
+const canvasR = document.getElementById('canvas-right');
+const ctxL = canvasL.getContext('2d');
+const ctxR = canvasR.getContext('2d');
+const ui = {
+    stage: document.getElementById('stage-display'),
+    score: document.getElementById('score-display'),
+    timer: document.getElementById('timer-display'),
+    hintBtn: document.getElementById('hint-btn'),
+    startModal: document.getElementById('start-modal'),
+    resultModal: document.getElementById('result-modal'),
+    diffBtns: document.querySelectorAll('.diff-btn'),
+    startBtn: document.getElementById('start-btn'),
+    wrapper: document.getElementById('game-wrapper')
+};
+
+/**
+ * AUDIO SYSTEM (Web Audio API) - Zero External Dependencies
+ */
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, type, duration, vol=0.1) {
+    if(!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function playChime() {
+    playTone(523.25, 'sine', 0.1, 0.3); // C5
+    setTimeout(() => playTone(659.25, 'sine', 0.1, 0.3), 100); // E5
+    setTimeout(() => playTone(783.99, 'sine', 0.3, 0.3), 200); // G5
+}
+
+function playBuzz() {
+    playTone(150, 'sawtooth', 0.2, 0.3);
+    setTimeout(() => playTone(100, 'sawtooth', 0.3, 0.3), 150);
+}
+
+function playWin() {
+    [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        setTimeout(() => playTone(freq, 'square', 0.2, 0.2), i * 150);
+    });
+}
+
+function playLose() {
+    [300, 250, 200, 150].forEach((freq, i) => {
+        setTimeout(() => playTone(freq, 'sawtooth', 0.3, 0.3), i * 200);
+    });
+}
+
+/**
+ * CANVAS DRAWING HELPERS
+ */
+const D = {
+    rect: (ctx, x, y, w, h, fill) => { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); },
+    circle: (ctx, x, y, r, fill) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fillStyle = fill; ctx.fill(); },
+    text: (ctx, txt, x, y, size, fill, align='center') => { ctx.font = `bold ${size}px Kanit, sans-serif`; ctx.fillStyle = fill; ctx.textAlign = align; ctx.fillText(txt, x, y); },
+    line: (ctx, x1, y1, x2, y2, color, w=2) => { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.strokeStyle = color; ctx.lineWidth = w; ctx.stroke(); },
+    poly: (ctx, pts, fill) => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
+};
+
+/**
+ * SCENE RENDERING ENGINE
+ * Draws procedurally based on stage and if it's the "bugged" (right) canvas.
+ */
+function renderScene(stageIndex, ctx, isRight) {
+    ctx.clearRect(0, 0, 500, 400);
+    const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+    // Helper to check if a specific difference should be drawn bugged
+    const isBugged = (id) => isRight && id < set.diffCount;
+
+    if (stageIndex === 0) { // Robot Lab
+        // Background & Table
+        D.rect(ctx, 0, 0, 500, 400, "#2d3748");
+        D.rect(ctx, 0, 300, 500, 100, "#4a5568");
+        D.line(ctx, 0, 300, 500, 300, "#718096", 4);
+        
+        // Diff 4: Wall Gear
+        ctx.save(); ctx.translate(420, 100);
+        if (isBugged(4)) { D.circle(ctx, 0, 0, 20, "#e2e8f0"); D.circle(ctx, 0, 0, 10, "#2d3748"); } // Different gear
+        else { D.circle(ctx, 0, 0, 25, "#a0aec0"); D.circle(ctx, 0, 0, 10, "#2d3748"); } // Normal gear
+        ctx.restore();
+
+        // Diff 6: Blueprint (Nightmare)
+        D.rect(ctx, 360, 220, 80, 80, "#2b6cb0");
+        D.line(ctx, 370, 240, 430, 240, isBugged(6) ? "#e53e3e" : "#ebf8ff", 2);
+        D.line(ctx, 370, 260, 410, 260, isBugged(6) ? "#e53e3e" : "#ebf8ff", 2);
+
+        // Robot Base
+        D.rect(ctx, 190, 180, 120, 120, "#cbd5e0"); // Body
+        D.rect(ctx, 210, 100, 80, 70, "#a0aec0");   // Head
+        
+        // Diff 0: Antenna
+        D.line(ctx, 250, 100, 250, 80, "#718096", 4);
+        if (isBugged(0)) D.poly(ctx, [{x:240,y:80},{x:260,y:80},{x:250,y:60}], "#3182ce"); // Blue triangle
+        else D.circle(ctx, 250, 75, 8, "#e53e3e"); // Red circle
+
+        // Eyes
+        D.circle(ctx, 275, 130, 10, "#ecc94b"); // Right eye
+        if (isBugged(1)) D.rect(ctx, 215, 120, 20, 20, "#9f7aea"); // Left eye bugged
+        else D.circle(ctx, 225, 130, 10, "#ecc94b"); // Left eye normal
+
+        // Diff 2: Chest Badge
+        D.rect(ctx, 220, 220, 60, 40, isBugged(2) ? "#e53e3e" : "#38a169");
+        D.text(ctx, isBugged(2) ? "404" : "OK", 250, 248, 20, "#fff");
+
+        // Diff 5: Leg Screw (Nightmare)
+        D.rect(ctx, 170, 300, 40, 60, "#a0aec0"); // Left Leg
+        D.rect(ctx, 290, 300, 40, 60, "#a0aec0"); // Right Leg
+        if (!isBugged(5)) D.circle(ctx, 190, 310, 3, "#1a202c"); // Screw exists
+
+        // Diff 3: Wrench
+        if (!isBugged(3)) {
+            D.rect(ctx, 100, 345, 40, 10, "#cbd5e0");
+            D.circle(ctx, 100, 350, 12, "#cbd5e0");
+            D.circle(ctx, 140, 350, 12, "#cbd5e0");
+        }
+    }
+    else if (stageIndex === 1) { // Server Room
+        D.rect(ctx, 0, 0, 500, 400, "#1a202c");
+        
+        // Racks
+        [50, 200, 350].forEach(x => {
+            D.rect(ctx, x, 50, 100, 300, "#2d3748");
+            D.rect(ctx, x+10, 60, 80, 280, "#1a202c");
+            // Servers inside rack
+            for(let y=70; y<330; y+=40) {
+                D.rect(ctx, x+15, y, 70, 30, "#4a5568");
+            }
+        });
+
+        // Diff 0: Server Light
+        D.circle(ctx, 150, 120, 6, isBugged(0) ? "#e53e3e" : "#48bb78"); // Rack 1, server 2
+        D.circle(ctx, 150, 160, 6, "#48bb78"); 
+
+        // Diff 4: Rack Handle
+        if (!isBugged(4)) D.rect(ctx, 100, 230, 8, 40, "#cbd5e0");
+        D.rect(ctx, 250, 230, 8, 40, "#cbd5e0");
+
+        // Diff 5: Warning Label (Nightmare)
+        D.rect(ctx, 230, 75, 40, 15, isBugged(5) ? "#edf2f7" : "#ecc94b");
+        
+        // Diff 6: Vent Hole (Nightmare)
+        if (!isBugged(6)) D.circle(ctx, 180, 330, 4, "#000");
+        D.circle(ctx, 190, 330, 4, "#000");
+
+        // Diff 2: Fan
+        ctx.save(); ctx.translate(250, 200);
+        D.circle(ctx, 0, 0, 25, "#1a202c");
+        ctx.fillStyle = "#a0aec0";
+        if (isBugged(2)) { // 3 blades
+            for(let i=0; i<3; i++) { ctx.rotate(Math.PI*2/3); ctx.fillRect(0, -5, 20, 10); }
+        } else { // 4 blades
+            for(let i=0; i<4; i++) { ctx.rotate(Math.PI/2); ctx.fillRect(0, -5, 20, 10); }
+        }
+        ctx.restore();
+
+        // Diff 3: Monitor Chart
+        D.rect(ctx, 370, 120, 60, 50, "#000");
+        D.line(ctx, 380, 160, 420, 160, "#fff");
+        D.line(ctx, 380, 160, 380, 130, "#fff");
+        ctx.strokeStyle = isBugged(3) ? "#e53e3e" : "#48bb78";
+        ctx.beginPath();
+        if (isBugged(3)) { ctx.moveTo(385, 135); ctx.lineTo(400, 155); ctx.lineTo(415, 150); } // Down
+        else { ctx.moveTo(385, 155); ctx.lineTo(400, 140); ctx.lineTo(415, 135); } // Up
+        ctx.stroke();
+
+        // Diff 1: Floor Cable
+        ctx.beginPath(); ctx.moveTo(0, 380); ctx.bezierCurveTo(200, 360, 300, 390, 500, 370);
+        ctx.strokeStyle = isBugged(1) ? "#dd6b20" : "#3182ce"; ctx.lineWidth = 6; ctx.stroke();
+    }
+    else if (stageIndex === 2) { // Robot Arena
+        D.rect(ctx, 0, 0, 500, 400, "#2c5282");
+        // Arena Floor
+        D.poly(ctx, [{x:50,y:200},{x:450,y:200},{x:500,y:400},{x:0,y:400}], "#4299e1");
+        // Grid
+        for(let i=50; i<500; i+=50) D.line(ctx, i, 200, i+(i-250)*0.5, 400, "#2b6cb0", 2);
+
+        // Diff 6: Wall Bolt
+        D.rect(ctx, 0, 100, 500, 100, "#2a4365");
+        if (!isBugged(6)) D.circle(ctx, 50, 150, 4, "#a0aec0");
+        D.circle(ctx, 450, 150, 4, "#a0aec0");
+
+        // Diff 0: Scoreboard
+        D.rect(ctx, 150, 30, 200, 60, "#000");
+        D.text(ctx, isBugged(0) ? "42 - 11" : "42 - 10", 250, 70, 36, "#e53e3e");
+
+        // Diff 5: Floor Logo
+        if (isBugged(5)) D.circle(ctx, 250, 330, 20, "#63b3ed");
+        else { // Starish shape
+            ctx.save(); ctx.translate(250, 330);
+            D.poly(ctx, [{x:0,y:-20},{x:5,y:-5},{x:20,y:-5},{x:10,y:5},{x:15,y:20},{x:0,y:10},{x:-15,y:20},{x:-10,y:5},{x:-20,y:-5},{x:-5,y:-5}], "#63b3ed");
+            ctx.restore();
+        }
+
+        // Diff 1: Bot 1
+        D.rect(ctx, 120, 230, 60, 40, "#e53e3e");
+        D.circle(ctx, 130, 270, 15, "#1a202c"); D.circle(ctx, 170, 270, 15, "#1a202c");
+        if (isBugged(1)) D.rect(ctx, 180, 240, 30, 10, "#a0aec0"); // Hammer
+        else D.poly(ctx, [{x:180,y:240},{x:220,y:245},{x:180,y:250}], "#a0aec0"); // Spike
+
+        // Diff 2: Bot 2
+        D.rect(ctx, 320, 230, 60, 40, "#3182ce");
+        let wR = isBugged(2) ? 10 : 15;
+        D.circle(ctx, 330, 270, wR, "#1a202c"); D.circle(ctx, 370, 270, wR, "#1a202c");
+        D.poly(ctx, [{x:320,y:240},{x:280,y:245},{x:320,y:250}], "#a0aec0");
+
+        // Diff 3: Cone
+        D.poly(ctx, [{x:250,y:170},{x:270,y:210},{x:230,y:210}], "#dd6b20");
+        if (!isBugged(3)) D.poly(ctx, [{x:245,y:185},{x:255,y:185},{x:260,y:195},{x:240,y:195}], "#fff");
+        else D.poly(ctx, [{x:245,y:185},{x:255,y:185},{x:260,y:195},{x:240,y:195}], "#000");
+
+        // Diff 4: Battery
+        D.rect(ctx, 410, 300, 40, 60, "#2d3748");
+        D.rect(ctx, 420, 290, 20, 10, "#2d3748");
+        D.rect(ctx, 415, 340, 30, 15, isBugged(4) ? "#e53e3e" : "#48bb78"); // level 1
+        if (!isBugged(4)) {
+            D.rect(ctx, 415, 320, 30, 15, "#48bb78"); // level 2
+            D.rect(ctx, 415, 305, 30, 10, "#48bb78"); // level 3
+        }
+    }
+    else if (stageIndex === 3) { // Game Dev Studio
+        D.rect(ctx, 0, 0, 500, 400, "#285e61");
+        D.rect(ctx, 0, 260, 500, 140, "#1a202c"); // Desk
+        
+        // Diff 2: Poster
+        D.rect(ctx, 370, 50, 100, 140, "#ebf8ff");
+        D.rect(ctx, 380, 60, 80, 80, "#2b6cb0");
+        if (isBugged(2)) D.rect(ctx, 415, 70, 10, 60, "#ecc94b"); // Wand
+        else { D.rect(ctx, 415, 70, 10, 60, "#a0aec0"); D.rect(ctx, 405, 110, 30, 10, "#4a5568"); } // Sword
+
+        // Diff 5: Plant (Nightmare)
+        D.rect(ctx, 40, 180, 40, 40, "#dd6b20"); // Pot
+        D.line(ctx, 60, 180, 60, 130, "#38a169", 4);
+        D.circle(ctx, 45, 150, 10, "#48bb78");
+        D.circle(ctx, 75, 140, 10, "#48bb78");
+        if (!isBugged(5)) D.circle(ctx, 60, 120, 10, "#48bb78"); // 3rd leaf
+
+        // Monitors
+        D.rect(ctx, 130, 100, 140, 100, "#000"); // Mon 1
+        D.rect(ctx, 180, 200, 40, 30, "#4a5568"); D.rect(ctx, 150, 230, 100, 10, "#4a5568");
+        
+        // Diff 0: Code Syntax
+        D.text(ctx, "function init() {", 195, 130, 14, "#48bb78", "center");
+        D.text(ctx, isBugged(0) ? "  if (x == 1) {" : "  if (x === 1) {", 195, 150, 14, "#4299e1", "center");
+        D.text(ctx, "    run();", 195, 170, 14, "#ecc94b", "center");
+        D.text(ctx, "  }", 195, 190, 14, "#fff", "center");
+
+        // Diff 6: Sticky Note
+        D.rect(ctx, 260, 110, 40, 40, "#faf089");
+        D.text(ctx, isBugged(6) ? "BUG" : "TODO", 280, 135, 12, "#000");
+
+        // Diff 1: Mug
+        D.rect(ctx, 80, 230, 30, 40, "#fff");
+        D.text(ctx, isBugged(1) ? "C#" : "JS", 95, 255, 16, "#d69e2e");
+
+        // Keyboard & Mouse
+        D.rect(ctx, 150, 270, 160, 40, "#4a5568");
+        // Diff 3: Spacebar
+        D.rect(ctx, 200, 290, 80, 10, isBugged(3) ? "#ed64a6" : "#cbd5e0");
+        
+        // Diff 4: Mouse Wire
+        D.rect(ctx, 330, 270, 20, 30, "#4a5568");
+        if (!isBugged(4)) D.line(ctx, 340, 270, 300, 240, "#1a202c", 2);
+    }
+    else if (stageIndex === 4) { // Space Shuttle
+        D.rect(ctx, 0, 0, 500, 400, "#000"); // Space
+        
+        // Stars
+        [ [50,50], [150,30], [300,80], [450,40], [350,150], [80,180] ].forEach(p => D.circle(ctx, p[0], p[1], 2, "#fff"));
+        
+        // Diff 3: Constellation
+        ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.beginPath();
+        if (isBugged(3)) { ctx.moveTo(100,50); ctx.lineTo(130,90); ctx.lineTo(90,120); } // Random
+        else { ctx.moveTo(100,70); ctx.lineTo(120,90); ctx.lineTo(150,80); ctx.lineTo(170,100); } // Dipper
+        ctx.stroke();
+
+        // Diff 0: Planet Rings
+        D.circle(ctx, 250, 120, 40, "#ed8936");
+        if (!isBugged(0)) {
+            ctx.beginPath(); ctx.ellipse(250, 120, 70, 15, Math.PI/8, 0, Math.PI*2);
+            ctx.strokeStyle = "rgba(237, 137, 54, 0.7)"; ctx.lineWidth = 8; ctx.stroke();
+        }
+
+        // Dashboard
+        D.poly(ctx, [{x:0,y:200},{x:500,y:200},{x:500,y:400},{x:0,y:400}], "#2d3748");
+        D.poly(ctx, [{x:0,y:200},{x:50,y:250},{x:450,y:250},{x:500,y:200}], "#4a5568"); // sloped
+
+        // Diff 1: Radar
+        D.circle(ctx, 150, 310, 50, "#22543d");
+        D.circle(ctx, 150, 310, 50, "rgba(72, 187, 120, 0.2)"); // Glass
+        D.line(ctx, 150, 310, 185, 275, "#48bb78", 2); // Sweep
+        D.circle(ctx, isBugged(1) ? 170 : 130, isBugged(1) ? 330 : 290, 5, "#48bb78"); // Blip
+
+        // Diff 6: Panel Text (Nightmare)
+        D.rect(ctx, 330, 240, 40, 20, "#1a202c");
+        D.text(ctx, isBugged(6) ? "ERR" : "OK", 350, 255, 14, isBugged(6) ? "#e53e3e" : "#48bb78");
+
+        // Diff 2: Main Button
+        D.circle(ctx, 350, 310, 30, isBugged(2) ? "#3182ce" : "#e53e3e");
+        D.circle(ctx, 350, 310, 20, "rgba(255,255,255,0.2)"); // Highlight
+
+        // Diff 5: Fuel Gauge
+        D.rect(ctx, 230, 260, 40, 80, "#1a202c");
+        let h = isBugged(5) ? 30 : 70;
+        D.rect(ctx, 235, 335-h, 30, h, isBugged(5) ? "#ecc94b" : "#48bb78");
+
+        // Diff 4: Control Lever
+        D.rect(ctx, 420, 270, 20, 60, "#000");
+        D.line(ctx, 430, 300, 430, isBugged(4) ? 320 : 280, "#cbd5e0", 6);
+        D.circle(ctx, 430, isBugged(4) ? 320 : 280, 10, "#e53e3e");
+    }
+
+    // Draw active found spots circles over BOTH
+    GAME_STATE.foundSpots.forEach(idx => {
+        const spot = STAGES[stageIndex].diffs[idx];
+        ctx.beginPath();
+        ctx.arc(spot.x, spot.y, set.radius, 0, Math.PI*2);
+        ctx.strokeStyle = '#10b981'; // Emerald glow
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+        ctx.fill();
+    });
+}
+
+function updateCanvases() {
+    renderScene(GAME_STATE.stage, ctxL, false);
+    renderScene(GAME_STATE.stage, ctxR, true);
+}
+
+/**
+ * GAME LOGIC & INTERACTIONS
+ */
+function getMousePos(canvas, evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+    };
+}
+
+function showFloatingText(x, y, text) {
+    // Standardize to wrapper coordinate space
+    const el = document.createElement('div');
+    el.className = 'floating-text';
+    el.textContent = text;
+    // Rough estimate positioning based on window, better to append to wrapper
+    el.style.left = `calc(50% - 15px)`; // Center of wrapper roughly, will override
+    
+    // Calculate absolute pos relative to viewport
+    const wrapperRect = ui.wrapper.getBoundingClientRect();
+    el.style.left = (x - 20) + 'px';
+    el.style.top = (y - 20) + 'px';
+    
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+}
+
+function handleCanvasClick(e, isRightCanvas) {
+    if (!GAME_STATE.isPlaying) return;
+    initAudio();
+
+    const canvas = isRightCanvas ? canvasR : canvasL;
+    const pos = getMousePos(canvas, e);
+    const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+    const diffs = STAGES[GAME_STATE.stage].diffs.slice(0, set.diffCount);
+    
+    let hitFound = false;
+
+    for (let i = 0; i < diffs.length; i++) {
+        if (GAME_STATE.foundSpots.includes(i)) continue;
+        
+        const d = diffs[i];
+        const dist = Math.hypot(d.x - pos.x, d.y - pos.y);
+        
+        if (dist <= set.radius) {
+            hitFound = true;
+            GAME_STATE.foundSpots.push(i);
+            playChime();
+            updateHUD();
+            updateCanvases();
+            checkWinCondition();
+            break;
+        }
+    }
+
+    if (!hitFound) {
+        playBuzz();
+        const penalty = set.penalty;
+        if (penalty > 0) {
+            GAME_STATE.timeLeft -= penalty;
+            showFloatingText(e.clientX, e.clientY, `-${penalty}s`);
+            if (GAME_STATE.timeLeft < 0) GAME_STATE.timeLeft = 0;
+            updateHUD();
+            if (GAME_STATE.timeLeft === 0) endGame(false);
+        } else {
+            showFloatingText(e.clientX, e.clientY, "Miss!");
+        }
+    }
+}
+
+canvasL.addEventListener('click', (e) => handleCanvasClick(e, false));
+canvasR.addEventListener('click', (e) => handleCanvasClick(e, true));
+
+ui.hintBtn.addEventListener('click', () => {
+    if (!GAME_STATE.isPlaying) return;
+    const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+    const diffs = STAGES[GAME_STATE.stage].diffs.slice(0, set.diffCount);
+    
+    for (let i = 0; i < diffs.length; i++) {
+        if (!GAME_STATE.foundSpots.includes(i)) {
+            // Apply Hint Penalty
+            GAME_STATE.timeLeft -= 10;
+            if(GAME_STATE.timeLeft < 0) GAME_STATE.timeLeft = 0;
+            
+            // Auto find
+            GAME_STATE.foundSpots.push(i);
+            playChime();
+            updateHUD();
+            updateCanvases();
+            checkWinCondition();
+            
+            if(GAME_STATE.timeLeft === 0 && GAME_STATE.isPlaying) endGame(false);
+            break;
+        }
+    }
+});
+
+function timerTick() {
+    if (!GAME_STATE.isPlaying) return;
+    GAME_STATE.timeLeft--;
+    updateHUD();
+    if (GAME_STATE.timeLeft <= 0) {
+        GAME_STATE.timeLeft = 0;
+        updateHUD();
+        endGame(false);
+    }
+}
+
+function updateHUD() {
+    const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+    ui.stage.innerText = `${GAME_STATE.stage + 1} : ${STAGES[GAME_STATE.stage].name}`;
+    ui.score.innerText = `${GAME_STATE.foundSpots.length} / ${set.diffCount}`;
+    
+    const m = Math.floor(GAME_STATE.timeLeft / 60).toString().padStart(2, '0');
+    const s = (GAME_STATE.timeLeft % 60).toString().padStart(2, '0');
+    ui.timer.innerText = `${m}:${s}`;
+    
+    if (GAME_STATE.timeLeft <= 10) ui.timer.className = "text-2xl font-bold text-rose-500 pulse-anim";
+    else ui.timer.className = "text-2xl font-bold text-emerald-400";
+}
+
+function startGame() {
+    initAudio();
+    ui.startModal.classList.add('hidden');
+    GAME_STATE.foundSpots = [];
+    GAME_STATE.timeLeft = DIFFICULTY_SETTINGS[GAME_STATE.difficulty].time;
+    GAME_STATE.isPlaying = true;
+    ui.hintBtn.disabled = false;
+    ui.hintBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    
+    updateHUD();
+    updateCanvases();
+    
+    if (GAME_STATE.timerId) clearInterval(GAME_STATE.timerId);
+    GAME_STATE.timerId = setInterval(timerTick, 1000);
+}
+
+function checkWinCondition() {
+    const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+    if (GAME_STATE.foundSpots.length === set.diffCount) {
+        endGame(true);
+    }
+}
+
+function drawMissedSpots() {
+    const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+    const diffs = STAGES[GAME_STATE.stage].diffs.slice(0, set.diffCount);
+    
+    [ctxL, ctxR].forEach(ctx => {
+        ctx.save();
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#f97316'; // Orange
+        diffs.forEach((d, i) => {
+            if (!GAME_STATE.foundSpots.includes(i)) {
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, set.radius, 0, Math.PI*2);
+                ctx.stroke();
+            }
+        });
+        ctx.restore();
+    });
+}
+
+function endGame(isWin) {
+    GAME_STATE.isPlaying = false;
+    clearInterval(GAME_STATE.timerId);
+    ui.hintBtn.disabled = true;
+    ui.hintBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+    ui.resultModal.classList.remove('hidden');
+    const starsContainer = document.getElementById('stars-container');
+    const msg = document.getElementById('result-message');
+    const title = document.getElementById('result-title');
+    const nextBtn = document.getElementById('next-btn');
+    const replayBtn = document.getElementById('replay-btn');
+    const stats = document.getElementById('final-stats');
+    
+    starsContainer.innerHTML = '<span>⭐</span><span>⭐</span><span>⭐</span>';
+    const starSpans = starsContainer.children;
+    for(let s of starSpans) s.className = "grayscale opacity-50";
+
+    if (isWin) {
+        playWin();
+        title.innerText = "ด่านสำเร็จ! (Stage Clear)";
+        title.className = "text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4";
+        
+        // Calculate stars
+        const set = DIFFICULTY_SETTINGS[GAME_STATE.difficulty];
+        const ratio = GAME_STATE.timeLeft / set.time;
+        let stars = 1;
+        if (ratio >= 0.5) stars = 3;
+        else if (ratio >= 0.2) stars = 2;
+        
+        GAME_STATE.totalStars += stars;
+
+        msg.innerText = `คุณใช้เวลาไป ${set.time - GAME_STATE.timeLeft} วินาที | ได้รับ ${stars} ดาว`;
+        
+        setTimeout(() => {
+            for(let i=0; i<stars; i++) {
+                setTimeout(() => {
+                    starSpans[i].className = "text-amber-400 transform scale-110 drop-shadow-[0_0_10px_rgba(251,191,36,0.8)] transition-all duration-300";
+                }, i * 300);
+            }
+        }, 100);
+
+        if (GAME_STATE.stage < STAGES.length - 1) {
+            nextBtn.classList.remove('hidden');
+            replayBtn.classList.add('hidden');
+            stats.classList.add('hidden');
+        } else {
+            // Game Complete
+            nextBtn.classList.add('hidden');
+            replayBtn.classList.remove('hidden');
+            stats.classList.remove('hidden');
+            msg.innerText = "ยินดีด้วย! คุณเคลียร์ครบทุกด่านแล้ว!";
+            
+            const maxStars = STAGES.length * 3;
+            let rank = "Junior Debugger";
+            if (GAME_STATE.totalStars >= 13) rank = "Cyber Legend 👑";
+            else if (GAME_STATE.totalStars >= 8) rank = "Senior Bug Hunter 🛡️";
+            
+            document.getElementById('rank-text').innerText = rank;
+            document.getElementById('score-summary').innerText = `สะสมดาวได้: ${GAME_STATE.totalStars} / ${maxStars} ดาว`;
+        }
+    } else {
+        playLose();
+        title.innerText = "หมดเวลา! (Time's Up)";
+        title.className = "text-4xl font-black text-rose-500 mb-4";
+        msg.innerText = "จับบั๊กไม่ครบ ระบบล้มเหลว... ตรวจสอบจุดที่พลาด (วงกลมเส้นประสีส้ม) แล้วลองใหม่!";
+        drawMissedSpots();
+        
+        nextBtn.classList.add('hidden');
+        replayBtn.classList.remove('hidden');
+        stats.classList.add('hidden');
+    }
+}
+
+// Event Listeners for UI
+ui.diffBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        ui.diffBtns.forEach(b => b.classList.remove('ring-4', 'ring-emerald-400', 'scale-105'));
+        const target = e.currentTarget;
+        target.classList.add('ring-4', 'ring-emerald-400', 'scale-105');
+        GAME_STATE.difficulty = parseInt(target.getAttribute('data-diff'));
+    });
+});
+
+ui.startBtn.addEventListener('click', startGame);
+
+document.getElementById('next-btn').addEventListener('click', () => {
+    ui.resultModal.classList.add('hidden');
+    GAME_STATE.stage++;
+    startGame();
+});
+
+document.getElementById('replay-btn').addEventListener('click', () => {
+    ui.resultModal.classList.add('hidden');
+    if (GAME_STATE.stage === STAGES.length - 1 && GAME_STATE.foundSpots.length === DIFFICULTY_SETTINGS[GAME_STATE.difficulty].diffCount) {
+        // Full restart
+        GAME_STATE.stage = 0;
+        GAME_STATE.totalStars = 0;
+        ui.startModal.classList.remove('hidden'); // Let them re-select difficulty
+    } else {
+        // Retry current stage
+        startGame();
+    }
+});
+
+// Initial Setup
+ui.diffBtns[0].click(); // Select Normal by default
+updateHUD();
+updateCanvases();
+
+</script>
+</body>
+</html>
